@@ -6,9 +6,6 @@ import lombok.ToString;
 
 import javax.json.Json;
 import javax.json.JsonObject;
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.charset.Charset;
 
 /**
  * Created by tom on 11.06.17.

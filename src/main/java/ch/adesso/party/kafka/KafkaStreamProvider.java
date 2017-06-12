@@ -1,6 +1,5 @@
 package ch.adesso.party.kafka;
 
-import ch.adesso.party.entity.CoreEvent;
 import ch.adesso.party.entity.EventConverter;
 import ch.adesso.party.entity.Person;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,8 +9,6 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.Serializer;
-import org.apache.kafka.connect.json.JsonDeserializer;
-import org.apache.kafka.connect.json.JsonSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
