@@ -1,0 +1,10 @@
+{"namespace": "ch.adesso.party.entity",
+  "type": "record",
+  "name": "TestAvro2",
+  "fields": [
+    {"name": "id", "type": "string"},
+    {"name": "timestamp",  "type": "long"},
+    {"name": "type",  "type": "string"},
+    {"name": "data",  "type": "string"}
+  ]
+}

@@ -2,44 +2,49 @@ package ch.adesso.party.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
-
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import java.time.LocalDateTime;
+import org.apache.avro.reflect.AvroDefault;
 
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 @ToString
 public class Person {
 
-    private String id;
+    @AvroDefault("0")
+    private long version = 0;
+
+    private String partyId;
+    @AvroDefault("null")
     private String firstname;
+    @AvroDefault("null")
     private String lastname;
-    private String status;
 
-    @XmlJavaTypeAdapter(LocalDateTimeAdapter.class)
-    private LocalDateTime birthdate;
-
-    public Person() {}
-
-    public Person applyEvent(PersonCreatedEvent event) {
-        this.id = event.getId();
-        this.lastname = "testLn";
-        this.firstname = "testFn";
+    public Person applyEvent(PartyEvent event) {
+        System.out.println("got event PartyEvent !!!!! " + event);
+        if(event instanceof PersonCreatedEvent) {
+            applyEvent((PersonCreatedEvent)event);
+        } else if((event instanceof PersonChangedEvent)) {
+            applyEvent((PersonChangedEvent) event);
+        }
         return this;
     }
 
+    public Person applyEvent(PersonChangedEvent event) {
+        System.out.println("got event PersonChangedEvent !!!!! " + event);
+        firstname = event.getFirstname();
+        lastname = event.getLastname();
+        version = version + 1;
+        return this;
+    }
 
-    public JsonObject toJson(){
-        return Json.createObjectBuilder()
-                .add("id", id)
-                .add("firstname", firstname)
-                .add("lastname", lastname)
-                .add("status", status)
-                .add("birthdate", birthdate.toString())
-                .build();
+    public Person applyEvent(PersonCreatedEvent event) {
+        System.out.println("got event PersonCreatedEvent !!!!! " + event);
+        firstname = event.getFirstname();
+        lastname = event.getLastname();
+        partyId = event.getPartyId();
+        return this;
     }
 
 }

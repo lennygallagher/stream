@@ -1,37 +1,25 @@
 package ch.adesso.party.entity;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-import javax.json.Json;
-import javax.json.JsonObject;
+import java.util.UUID;
 
 /**
  * Created by tom on 11.06.17.
  */
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
 @ToString
 public class CoreEvent {
-    private String id;
-    private String name;
+    private String eventId;
+    private String eventType;
+    private long timestamp;
 
-    public CoreEvent () {}
-
-    public void fromJsonObject(JsonObject jsonObject) {
-        String name = jsonObject.getString("name");
-        String id = jsonObject.getString("id");
-
-        this.id = id;
-        this.name = name;
+    public CoreEvent(Class<?> eventType) {
+        this.eventId = UUID.randomUUID().toString();
+        this.timestamp = System.nanoTime();
+        this.eventType = eventType.getName();
     }
-
-    public JsonObject toJson(){
-        return Json.createObjectBuilder()
-                .add("id", id)
-                .add("name", name)
-                .build();
-    }
-
 }

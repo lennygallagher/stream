@@ -1,14 +1,12 @@
 package ch.adesso.party.kafka;
 
-import ch.adesso.party.entity.EventConverter;
+import ch.adesso.party.entity.EventEnvelope;
 import ch.adesso.party.entity.Person;
-import com.fasterxml.jackson.databind.JsonNode;
+import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
@@ -24,8 +22,7 @@ import javax.ejb.ConcurrencyManagementType;
 import javax.ejb.Singleton;
 import javax.enterprise.inject.Produces;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
 import java.util.Properties;
 
 
@@ -39,15 +36,16 @@ public class KafkaStreamProvider {
     public static final String ADDRESS_TOPIC = "address-topic";
 
     private static final String KAFKA_BROKER_HOST = System.getenv("KAFKA_BROKER_HOST") != null ? System.getenv("KAFKA_BROKER_HOST"): "localhost";
-    private static final String BOOTSTRAP_SERVERS = String.format("kafka-1:29092,kafka-2:39092,kafka-3:49092",
-            KAFKA_BROKER_HOST, KAFKA_BROKER_HOST, KAFKA_BROKER_HOST);
+    private static final String BOOTSTRAP_SERVERS = "kafka-1:29092,kafka-2:39092,kafka-3:49092";
+    private static final String SCHEMA_REGISTRY_URL = "http://schema-registry:8081";
+
     private static final String APPLICATION_CONFIG_ID = "streams-app";
     private static final String APPLICATION_SERVER_ID = "localhost:8080";
     private static final String STATE_DIR = "/tmp/kafka-streams";
 
 
     private KafkaStreams kafkaStreams;
-    private KafkaProducer<String, JsonNode> producer;
+    private KafkaProducer<String, Object> producer;
 
     @PostConstruct
     public void init() {
@@ -61,7 +59,7 @@ public class KafkaStreamProvider {
     }
 
     @Produces
-    public KafkaProducer<String, JsonNode> getProducer() {
+    public KafkaProducer<String, Object> getProducer() {
         return producer;
     }
 
@@ -71,11 +69,12 @@ public class KafkaStreamProvider {
     }
 
 
-    public KafkaProducer<String, JsonNode> createProducer() {
+    public KafkaProducer<String, Object> createProducer() {
         Properties properties = new Properties();
         properties.put("bootstrap.servers", BOOTSTRAP_SERVERS);
         properties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        properties.put("value.serializer", "org.apache.kafka.connect.json.JsonSerializer");
+        properties.put("value.serializer", "io.confluent.kafka.serializers.KafkaAvroSerializer");
+        properties.put("schema.registry.url", SCHEMA_REGISTRY_URL);
         return new KafkaProducer<>(properties);
     }
 
@@ -102,6 +101,12 @@ public class KafkaStreamProvider {
         // situations where the input topic was not pre-created before running the application because
         // the application will discover a newly created topic faster.  In production, you would
         // typically not change this parameter from its default.
+
+        streamsConfiguration.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, SCHEMA_REGISTRY_URL);
+        // Specify default (de)serializers for record keys and for record values.
+        streamsConfiguration.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        streamsConfiguration.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArray().getClass().getName());
+
         String metadataMaxAgeMs = System.getProperty(ConsumerConfig.METADATA_MAX_AGE_CONFIG);
         if (metadataMaxAgeMs != null) {
             try {
@@ -116,25 +121,31 @@ public class KafkaStreamProvider {
 
         streamsConfiguration.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
 
-        Map<String, Object> serdeProps = new HashMap<>();
 
-        final Serializer<Person> personSerializer = new JsonPOJOSerializer<>();
-        serdeProps.put("JsonPOJOClass", Person.class);
-        personSerializer.configure(serdeProps, false);
+        final Serde<EventEnvelope> eventSerde = Serdes.serdeFrom(new KafkaAvroReflectSerializer<>(),
+                new KafkaAvroReflectDeserializer<>(EventEnvelope.class));
 
-        final Deserializer<Person> personDeserializer = new JsonPOJODeserializer<>();
-        personDeserializer.configure(serdeProps, false);
+        // important to configure schema registry
+        eventSerde.configure(
+                Collections.singletonMap(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG,
+                        SCHEMA_REGISTRY_URL),false);
 
-        final Serde<Person> personSerde = Serdes.serdeFrom(personSerializer, personDeserializer);
+        final Serde<Person> personSerde = Serdes.serdeFrom(new KafkaAvroReflectSerializer<>(),
+                new KafkaAvroReflectDeserializer<>(Person.class));
+
+        personSerde.configure(
+                Collections.singletonMap(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG,
+                        SCHEMA_REGISTRY_URL),false);
 
         final KStreamBuilder builder = new KStreamBuilder();
 
-        KStream<String, String> personEventStream = builder.stream(Serdes.String(), Serdes.String(), PERSON_TOPIC);
+        // read person event stream
+        KStream<String, EventEnvelope> personEventStream = builder.stream(Serdes.String(), eventSerde, PERSON_TOPIC);
 
-
-        personEventStream.groupByKey(Serdes.String(), Serdes.String())
+        // aggregate events to person
+        personEventStream.groupByKey(Serdes.String(), eventSerde)
                 .aggregate(Person::new,
-                        (aggKey, newValue, person) -> person.applyEvent(EventConverter.convert(newValue)),
+                        (aggKey, newValue, person) -> person.applyEvent(newValue.getEvent()),
                         personSerde,
                         PERSON_STORE);
 

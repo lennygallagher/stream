@@ -1,0 +1,13 @@
+@namespace("ch.adesso.party.entity")
+protocol PartyMessage {
+
+   import schema "test.avsc";
+   import schema "test2.avsc";
+
+   record PartyEvents {
+      string eventType;
+      long timestamp;
+      union {TestAvro, TestAvro2} event;
+   }
+
+}
