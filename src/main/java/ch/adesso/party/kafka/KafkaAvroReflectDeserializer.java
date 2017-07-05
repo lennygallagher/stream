@@ -3,7 +3,6 @@ package ch.adesso.party.kafka;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.AbstractKafkaAvroDeserializer;
-import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.io.BinaryDecoder;
@@ -36,7 +35,7 @@ public class KafkaAvroReflectDeserializer<T> extends AbstractKafkaAvroDeserializ
 
     public KafkaAvroReflectDeserializer() {
         Type t = ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
-        readerSchema = ReflectData.get().getSchema(t.getClass());
+        readerSchema = ReflectData.get().getSchema((Class<T>)t);
     }
 
     public KafkaAvroReflectDeserializer(SchemaRegistryClient client) {

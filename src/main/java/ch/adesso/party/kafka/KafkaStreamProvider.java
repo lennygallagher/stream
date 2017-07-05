@@ -1,5 +1,6 @@
 package ch.adesso.party.kafka;
 
+import ch.adesso.party.entity.CoreEvent;
 import ch.adesso.party.entity.EventEnvelope;
 import ch.adesso.party.entity.Person;
 import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
@@ -20,7 +21,9 @@ import javax.annotation.PreDestroy;
 import javax.ejb.ConcurrencyManagement;
 import javax.ejb.ConcurrencyManagementType;
 import javax.ejb.Singleton;
+import javax.enterprise.event.Event;
 import javax.enterprise.inject.Produces;
+import javax.inject.Inject;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Properties;
@@ -40,7 +43,7 @@ public class KafkaStreamProvider {
     private static final String SCHEMA_REGISTRY_URL = "http://schema-registry:8081";
 
     private static final String APPLICATION_CONFIG_ID = "streams-app";
-    private static final String APPLICATION_SERVER_ID = "localhost:8080";
+    private static final String APPLICATION_SERVER_ID = "localhost:8093";
     private static final String STATE_DIR = "/tmp/kafka-streams";
 
 
@@ -96,17 +99,17 @@ public class KafkaStreamProvider {
         // Set the commit interval to 500ms so that any changes are flushed frequently and the top five
         // charts are updated with low latency.
         streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 500);
-        // Allow the user to fine-tune the `metadata.max.age.ms` via Java system properties from the CLI.
-        // Lowering this parameter from its default of 5 minutes to a few seconds is helpful in
-        // situations where the input topic was not pre-created before running the application because
-        // the application will discover a newly created topic faster.  In production, you would
-        // typically not change this parameter from its default.
 
         streamsConfiguration.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, SCHEMA_REGISTRY_URL);
         // Specify default (de)serializers for record keys and for record values.
         streamsConfiguration.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArray().getClass().getName());
 
+        // Allow the user to fine-tune the `metadata.max.age.ms` via Java system properties from the CLI.
+        // Lowering this parameter from its default of 5 minutes to a few seconds is helpful in
+        // situations where the input topic was not pre-created before running the application because
+        // the application will discover a newly created topic faster.  In production, you would
+        // typically not change this parameter from its default.
         String metadataMaxAgeMs = System.getProperty(ConsumerConfig.METADATA_MAX_AGE_CONFIG);
         if (metadataMaxAgeMs != null) {
             try {
@@ -119,7 +122,7 @@ public class KafkaStreamProvider {
         } else
             streamsConfiguration.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, 500);
 
-        streamsConfiguration.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+        streamsConfiguration.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 1000);
 
 
         final Serde<EventEnvelope> eventSerde = Serdes.serdeFrom(new KafkaAvroReflectSerializer<>(),
